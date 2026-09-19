@@ -17,7 +17,7 @@ import java.io.IOException;
 /**
  * Se ejecuta cuando la peticion no trae un JWT valido: sin token, token
  * expirado, firma invalida, o issuer/audience incorrectos (ver JwtConfig y
- * AudienceValidator). Siempre responde 401 con un cuerpo JSON consistente,
+ * CognitoAudienceValidator). Siempre responde 401 con un cuerpo JSON consistente,
  * en vez de dejar pasar la peticion o devolver el HTML por defecto de Spring.
  */
 @Component

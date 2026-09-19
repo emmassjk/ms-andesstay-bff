@@ -10,27 +10,28 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # Documento de descubrimiento OIDC de Azure AD (v2.0). Reemplazar {tenant-id}
-          # por el Directory (tenant) ID de la app registrada en Azure AD.
-          issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID:CHANGE_ME-tenant-id}/v2.0
+          # --- Seguridad: AWS Cognito (mismo User Pool que catalog, audit y el resto) ---
+          # Reemplazar {region} y {userPoolId} por los del User Pool real via variables de entorno.
+          issuer-uri: https://cognito-idp.${COGNITO_REGION:us-east-1}.amazonaws.com/${COGNITO_USER_POOL_ID:CHANGE_ME}
 
 server:
   port: ${SERVER_PORT:8080}
 
 # --- Configuracion propia del BFF (IDaaS + microservicios de dominio) ---
-azure:
-  ad:
-    # Application (client) ID de la API expuesta por el BFF en Azure AD.
-    # Debe coincidir con el "aud" (audience) del JWT emitido para esta API.
-    audience: ${AZURE_API_CLIENT_ID:CHANGE_ME-audience}
+cognito:
+  # App Client ID del User Pool. Los access tokens de Cognito no traen "aud", traen
+  # "client_id"; debe coincidir con el App Client con el que el frontend hace login.
+  app-client-id: ${COGNITO_APP_CLIENT_ID:CHANGE_ME}
 
 andesstay:
   services:
     catalog:
       base-url: ${CATALOG_SERVICE_URL:http://localhost:8081}
+    audit:
+      base-url: ${AUDIT_SERVICE_URL:http://localhost:8083}
 
 cors:
-  # Origen del frontend Angular (MSAL redirige y llama al BFF desde aqui).
+  # Origen del frontend Angular (login con Cognito y llamadas al BFF desde aqui).
   allowed-origins: ${FRONTEND_URL:http://localhost:4200}
 
 logging:

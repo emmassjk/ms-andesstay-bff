@@ -2,6 +2,7 @@ package cl.duoc.andesstay.bff.client;
 
 import cl.duoc.andesstay.bff.dto.UnitDto;
 import cl.duoc.andesstay.bff.dto.UnitRequestDto;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -12,6 +13,9 @@ import java.util.List;
  * conoce esta interfaz; si mas adelante el catalogo pasa a exponerse via
  * AWS API Gateway con otra ruta/base-url, solo cambia application.yml.
  *
+ * El access token de Cognito del usuario se reenvia en cada llamada
+ * (ver BearerTokenPropagationFilter en WebClientConfig).
+ *
  * Se usa .block() porque el BFF es una app servlet (MVC) clasica: cada
  * request ya corre en su propio hilo, asi que no se busca no-bloqueo aqui,
  * solo reusar WebClient como cliente HTTP moderno.
@@ -21,7 +25,7 @@ public class CatalogClient {
 
     private final WebClient catalogWebClient;
 
-    public CatalogClient(WebClient catalogWebClient) {
+    public CatalogClient(@Qualifier("catalogWebClient") WebClient catalogWebClient) {
         this.catalogWebClient = catalogWebClient;
     }
 

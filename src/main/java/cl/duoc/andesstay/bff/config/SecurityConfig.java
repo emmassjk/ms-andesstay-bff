@@ -1,6 +1,6 @@
 package cl.duoc.andesstay.bff.config;
 
-import cl.duoc.andesstay.bff.security.AzureAdJwtAuthenticationConverter;
+import cl.duoc.andesstay.bff.security.CognitoJwtAuthenticationConverter;
 import cl.duoc.andesstay.bff.security.RestAccessDeniedHandler;
 import cl.duoc.andesstay.bff.security.RestAuthenticationEntryPoint;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,14 +21,25 @@ import java.util.List;
 /**
  * Configuracion central de seguridad del BFF.
  *
- * Rol del BFF en la arquitectura (Angular + MSAL) -> (AWS API Gateway) -> BFF -> microservicios:
- *   1. Verifica que exista un JWT valido emitido por Azure AD (firma, issuer,
- *      audience y vigencia; ver JwtConfig) para CUALQUIER endpoint de negocio.
- *   2. Aplica autorizacion por rol (claim "roles" del token, ver
- *      AzureAdJwtAuthenticationConverter): solo ADMIN puede escribir sobre el
- *      catalogo, CLIENTE y ADMIN pueden leerlo.
+ * Rol del BFF en la arquitectura (Angular + Cognito) -> (AWS API Gateway) -> BFF -> microservicios:
+ *   1. Verifica que exista un access token valido emitido por el User Pool
+ *      de Cognito (firma, issuer, client_id y vigencia; ver JwtConfig) para
+ *      CUALQUIER endpoint de negocio.
+ *   2. Aplica autorizacion por rol (claim "cognito:groups" del token, ver
+ *      CognitoJwtAuthenticationConverter), con las mismas reglas que los
+ *      microservicios de dominio:
+ *
+ *        GET  /api/catalog/units/**        -> cualquier usuario autenticado
+ *        POST/PUT/DELETE catalogo          -> solo ADMIN
+ *        GET  /api/audit/**                -> ADMIN o AUDITOR
+ *
  *   3. Solo si ambas condiciones se cumplen, permite que la peticion llegue
- *      al controller que reenvia la llamada al microservicio de dominio.
+ *      al controller que reenvia la llamada al microservicio de dominio
+ *      (junto con el mismo token, ver BearerTokenPropagationFilter).
+ *
+ * Antes esta cadena tenia anyRequest().permitAll() y el resource server no
+ * estaba conectado, asi que el BFF no exigia token en ninguna ruta. Ahora
+ * .oauth2ResourceServer(...) SI queda conectado al filterChain.
  */
 @Configuration
 @EnableWebSecurity
@@ -38,14 +49,14 @@ public class SecurityConfig {
     @Value("${cors.allowed-origins}")
     private String allowedOrigins;
 
-    private final AzureAdJwtAuthenticationConverter azureAdJwtAuthenticationConverter;
+    private final CognitoJwtAuthenticationConverter cognitoJwtAuthenticationConverter;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
 
-    public SecurityConfig(AzureAdJwtAuthenticationConverter azureAdJwtAuthenticationConverter,
+    public SecurityConfig(CognitoJwtAuthenticationConverter cognitoJwtAuthenticationConverter,
                            RestAuthenticationEntryPoint authenticationEntryPoint,
                            RestAccessDeniedHandler accessDeniedHandler) {
-        this.azureAdJwtAuthenticationConverter = azureAdJwtAuthenticationConverter;
+        this.cognitoJwtAuthenticationConverter = cognitoJwtAuthenticationConverter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
     }
@@ -57,14 +68,33 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll());
+                        // Sin esto, cualquier error que Spring MVC resuelva con sendError() (p.ej. JSON mal
+                        // formado) se redirige a /error, que llega sin token y terminaria como 401/403.
+                        .requestMatchers("/error").permitAll()
+                        // health publico para el API Gateway / balanceador si se agrega actuator
+                        .requestMatchers("/actuator/health").permitAll()
+
+                        // --- Catalogo (mismas reglas que ms-andesstay-catalog) ---
+                        .requestMatchers(HttpMethod.GET, "/api/catalog/units/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/catalog/units/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/catalog/units/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/catalog/units/**").hasRole("ADMIN")
+
+                        // --- Auditoria (mismas reglas que ms-andesstay-audit) ---
+                        .requestMatchers("/api/audit/**").hasAnyRole("ADMIN", "AUDITOR")
+
+                        .anyRequest().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(cognitoJwtAuthenticationConverter)));
 
         return http.build();
     }
 
     /**
      * Permite que Angular (levantado en otro origen/puerto) consuma el BFF
-     * enviando el header Authorization: Bearer <token>.
+     * enviando el header Authorization: Bearer <access_token>.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {

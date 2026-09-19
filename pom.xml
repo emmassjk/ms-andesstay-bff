@@ -15,8 +15,8 @@
     <artifactId>ms-andesstay-bff</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>ms-andesstay-bff</name>
-    <description>BFF (Backend For Frontend) del caso AndesStay - valida JWT emitido por Azure AD (IDaaS) y
-        expone/orquesta los microservicios de dominio (catalogo, etc.) para el frontend Angular.</description>
+    <description>BFF (Backend For Frontend) del caso AndesStay - valida el JWT emitido por AWS Cognito (IDaaS) y
+        expone/orquesta los microservicios de dominio (catalogo, auditoria) para el frontend Angular.</description>
 
     <properties>
         <java.version>17</java.version>

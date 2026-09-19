@@ -30,7 +30,7 @@ public class GlobalExceptionHandler {
         ErrorResponse body = ErrorResponse.of(
                 status.value(),
                 status.toString(),
-                "El microservicio de catalogo respondio con un error: " + ex.getStatusText(),
+                "El microservicio de dominio respondio con un error: " + ex.getStatusText(),
                 request.getRequestURI());
         return ResponseEntity.status(status).body(body);
     }
@@ -42,7 +42,7 @@ public class GlobalExceptionHandler {
         ErrorResponse body = ErrorResponse.of(
                 HttpStatus.BAD_GATEWAY.value(),
                 "bad_gateway",
-                "No fue posible comunicarse con el microservicio de catalogo.",
+                "No fue posible comunicarse con el microservicio de dominio.",
                 request.getRequestURI());
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
     }
