@@ -15,7 +15,8 @@ import java.util.List;
  * No contiene logica de negocio: valida y reenvia hacia
  * ms-andesstay-catalog a traves de CatalogClient.
  *
- * La autenticacion (JWT valido) y autorizacion (rol ADMIN/CLIENTE) de estas
+ * La autenticacion (access token de Cognito valido) y autorizacion (lectura: cualquier usuario
+ * autenticado; escritura: rol ADMIN) de estas
  * rutas ya se resuelven antes de llegar aqui, en SecurityConfig; si esta
  * clase se ejecuta, es porque el token era valido y el rol alcanzaba.
  */
