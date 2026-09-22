@@ -1,12 +1,14 @@
 package cl.duoc.andesstay.bff.client;
 
-import cl.duoc.andesstay.bff.dto.UnitDto;
-import cl.duoc.andesstay.bff.dto.UnitRequestDto;
+import java.time.Duration;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.List;
+import cl.duoc.andesstay.bff.dto.UnitDto;
+import cl.duoc.andesstay.bff.dto.UnitRequestDto;
 
 /**
  * Encapsula las llamadas HTTP hacia ms-andesstay-catalog. El controller solo
@@ -35,7 +37,7 @@ public class CatalogClient {
                 .retrieve()
                 .bodyToFlux(UnitDto.class)
                 .collectList()
-                .block();
+                .block(Duration.ofSeconds(6));
     }
 
     public UnitDto findById(Long id) {
@@ -43,7 +45,7 @@ public class CatalogClient {
                 .uri("/api/catalog/units/{id}", id)
                 .retrieve()
                 .bodyToMono(UnitDto.class)
-                .block();
+                .block(Duration.ofSeconds(6));
     }
 
     public UnitDto create(UnitRequestDto request) {
@@ -52,7 +54,7 @@ public class CatalogClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(UnitDto.class)
-                .block();
+                .block(Duration.ofSeconds(6));
     }
 
     public UnitDto update(Long id, UnitRequestDto request) {
@@ -61,7 +63,7 @@ public class CatalogClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(UnitDto.class)
-                .block();
+                .block(Duration.ofSeconds(6));
     }
 
     public void delete(Long id) {
@@ -69,6 +71,6 @@ public class CatalogClient {
                 .uri("/api/catalog/units/{id}", id)
                 .retrieve()
                 .toBodilessEntity()
-                .block();
+                .block(Duration.ofSeconds(6));
     }
 }
