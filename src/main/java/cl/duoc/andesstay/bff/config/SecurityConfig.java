@@ -32,6 +32,10 @@ import java.util.List;
  *        GET  /api/catalog/units/**        -> cualquier usuario autenticado
  *        POST/PUT/DELETE catalogo          -> solo ADMIN
  *        GET  /api/audit/**                -> ADMIN o AUDITOR
+ *        GET  /api/reservations/**         -> cualquier usuario autenticado
+ *        POST /api/reservations/**         -> RECEPCIONISTA o ADMIN
+ *        PUT/PATCH /api/reservations/**    -> RECEPCIONISTA o ADMIN
+ *        DELETE /api/reservations/**       -> solo ADMIN
  *
  *   3. Solo si ambas condiciones se cumplen, permite que la peticion llegue
  *      al controller que reenvia la llamada al microservicio de dominio
@@ -82,6 +86,18 @@ public class SecurityConfig {
 
                         // --- Auditoria (mismas reglas que ms-andesstay-audit) ---
                         .requestMatchers("/api/audit/**").hasAnyRole("ADMIN", "AUDITOR")
+
+                        // --- Reservas (mismas reglas que ms-andesstay-reservations) ---
+                        // GET: cualquier usuario autenticado (huesped consulta sus reservas,
+                        //      recepcionista y admin consultan todas).
+                        .requestMatchers(HttpMethod.GET,    "/api/reservations/**").authenticated()
+                        // POST: crear reserva -> huesped, recepcionista o admin.
+                        .requestMatchers(HttpMethod.POST,   "/api/reservations/**").hasAnyRole("HUESPED", "RECEPCIONISTA", "ADMIN")
+                        // PUT/PATCH: modificar reserva -> recepcionista o admin.
+                        .requestMatchers(HttpMethod.PUT,    "/api/reservations/**").hasAnyRole("RECEPCIONISTA", "ADMIN")
+                        .requestMatchers(HttpMethod.PATCH,  "/api/reservations/**").hasAnyRole("RECEPCIONISTA", "ADMIN")
+                        // DELETE: cancelar/eliminar reserva -> solo admin.
+                        .requestMatchers(HttpMethod.DELETE, "/api/reservations/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2

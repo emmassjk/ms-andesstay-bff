@@ -16,7 +16,8 @@ encargo, es:
 ```
 Angular (Cognito) --Bearer access_token--> [AWS API Gateway] --> ms-andesstay-bff --Bearer access_token--> ms-andesstay-catalog
                                                                   (valida JWT,                         \-> ms-andesstay-audit
-                                                                   aplica roles)                          (validan el JWT otra vez)
+                                                                   aplica roles)                          \-> ms-andesstay-reservations
+                                                                                                             (validan el JWT otra vez)
 ```
 
 ## Stack
@@ -35,16 +36,16 @@ src/main/java/cl/duoc/andesstay/bff/
 ├── config/
 │   ├── JwtConfig.java          # JwtDecoder: valida firma + issuer + client_id
 │   ├── SecurityConfig.java     # Reglas de autorizacion por rol y CORS
-│   └── WebClientConfig.java    # WebClient hacia catalog y hacia audit
+│   └── WebClientConfig.java    # WebClient hacia catalog, audit y reservations
 ├── security/
 │   ├── CognitoAudienceValidator.java           # Valida el claim "client_id"
 │   ├── CognitoJwtAuthenticationConverter.java  # Mapea "cognito:groups" -> ROLE_*
 │   ├── BearerTokenPropagationFilter.java       # Reenvia el access token al microservicio
 │   ├── RestAuthenticationEntryPoint.java       # 401 homogeneo (token invalido)
 │   └── RestAccessDeniedHandler.java            # 403 homogeneo (rol insuficiente)
-├── client/                     # CatalogClient, AuditClient (llamadas HTTP)
-├── controller/                 # CatalogProxyController, AuditProxyController
-├── dto/                        # UnitDto, UnitRequestDto, AuditEventDto, PageResponse, ErrorResponse
+├── client/                     # CatalogClient, AuditClient, ReservationsClient (llamadas HTTP)
+├── controller/                 # CatalogProxyController, AuditProxyController, ReservationsProxyController
+├── dto/                        # UnitDto, UnitRequestDto, AuditEventDto, ReservationDto, PageResponse, ErrorResponse
 └── exception/GlobalExceptionHandler.java   # Traduce errores del downstream
 ```
 
@@ -68,6 +69,7 @@ export COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
 export COGNITO_APP_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
 export CATALOG_SERVICE_URL=http://localhost:8081
 export AUDIT_SERVICE_URL=http://localhost:8083
+export RESERVATIONS_SERVICE_URL=http://localhost:8084
 export FRONTEND_URL=http://localhost:4200
 ```
 
@@ -91,14 +93,18 @@ local), pero rechaza todos los tokens con `401` hasta que se configure el User P
 
 ## Endpoints expuestos al frontend
 
-| Metodo | Ruta                        | Requiere                | Se reenvia a                    |
-|--------|-----------------------------|-------------------------|---------------------------------|
-| GET    | `/api/catalog/units`        | Usuario autenticado     | catalog `GET /api/catalog/units` |
-| GET    | `/api/catalog/units/{id}`   | Usuario autenticado     | catalog                          |
-| POST   | `/api/catalog/units`        | Grupo `ADMIN`           | catalog                          |
-| PUT    | `/api/catalog/units/{id}`   | Grupo `ADMIN`           | catalog                          |
-| DELETE | `/api/catalog/units/{id}`   | Grupo `ADMIN`           | catalog                          |
-| GET    | `/api/audit`                | Grupo `ADMIN` o `AUDITOR` | audit `GET /api/audit`         |
+| Metodo       | Ruta                            | Requiere                          | Se reenvia a                              |
+|--------------|---------------------------------|-----------------------------------|-------------------------------------------|
+| GET          | `/api/catalog/units`            | Usuario autenticado               | catalog `GET /api/catalog/units`          |
+| GET          | `/api/catalog/units/{id}`       | Usuario autenticado               | catalog                                   |
+| POST         | `/api/catalog/units`            | Grupo `ADMIN`                     | catalog                                   |
+| PUT          | `/api/catalog/units/{id}`       | Grupo `ADMIN`                     | catalog                                   |
+| DELETE       | `/api/catalog/units/{id}`       | Grupo `ADMIN`                     | catalog                                   |
+| GET          | `/api/audit`                    | Grupo `ADMIN` o `AUDITOR`         | audit `GET /api/audit`                    |
+| GET          | `/api/reservations/**`          | Usuario autenticado               | reservations                              |
+| POST         | `/api/reservations/**`          | Grupo `HUESPED`, `RECEPCIONISTA` o `ADMIN` | reservations                   |
+| PUT / PATCH  | `/api/reservations/**`          | Grupo `RECEPCIONISTA` o `ADMIN`   | reservations                              |
+| DELETE       | `/api/reservations/**`          | Grupo `ADMIN`                     | reservations                              |
 
 `/api/audit` acepta los query params opcionales `usuario`, `tipoEvento`, `desde`, `hasta`
 (ISO-8601), `page` (default 0) y `size` (default 20, maximo 100), y responde una pagina
@@ -111,6 +117,9 @@ grupo requerido -> `403`.
 ```bash
 curl -H "Authorization: Bearer $ACCESS_TOKEN" \
      "http://localhost:8080/api/audit?tipoEvento=RESERVA_CONFIRMADA&desde=2026-09-01T00:00:00Z"
+
+curl -H "Authorization: Bearer $ACCESS_TOKEN" \
+     "http://localhost:8080/api/reservations/my"
 ```
 
 ## Como se cubre cada criterio de la pauta (Indicador 2, BFF/API Manager)
@@ -126,7 +135,9 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" \
 - **Aplica autorizacion por rol cuando corresponde**: reglas
   `authenticated()` / `hasRole(...)` / `hasAnyRole(...)` en `SecurityConfig`, alimentadas por
   `CognitoJwtAuthenticationConverter` (claim `cognito:groups` -> `ROLE_*`). El resource
-  server esta conectado al `SecurityFilterChain` (`.oauth2ResourceServer(...)`).
+  server esta conectado al `SecurityFilterChain` (`.oauth2ResourceServer(...)`). Cada
+  dominio tiene su bloque explícito de `requestMatchers` (catalogo, auditoria y reservas)
+  en lugar de depender únicamente del genérico `anyRequest().authenticated()`.
 - **Responde con codigos de error adecuados**: `RestAuthenticationEntryPoint`
   (401 - sin token / token invalido), `RestAccessDeniedHandler` (403 - rol
   insuficiente) y `GlobalExceptionHandler` (400 en validaciones, 4xx
@@ -138,9 +149,10 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" \
 mvn test
 ```
 
-- `CatalogProxySecurityTest` / `AuditProxySecurityTest` (`@WebMvcTest` + `spring-security-test`,
-  importando `SecurityConfig` real): sin token -> `401`; token sin el grupo requerido -> `403`;
-  con el grupo correcto -> pasa la autorizacion; el tamano de pagina de `/api/audit` se acota.
+- `CatalogProxySecurityTest` / `AuditProxySecurityTest` / `ReservationsProxySecurityTest`
+  (`@WebMvcTest` + `spring-security-test`, importando `SecurityConfig` real): sin token ->
+  `401`; token sin el grupo requerido -> `403`; con el grupo correcto -> pasa la
+  autorizacion; el tamano de pagina de `/api/audit` se acota.
 - `CognitoJwtAuthenticationConverterTest`: `cognito:groups` -> `ROLE_*`.
 - `CognitoAudienceValidatorTest`: acepta el `client_id` esperado; rechaza otro App Client y
   rechaza un ID token (solo trae `aud`).
@@ -148,8 +160,10 @@ mvn test
 
 ## Pendiente / siguiente fase
 
-- Incorporar `ms-andesstay-reservations` (y su ruta en `SecurityConfig`) cuando ese
-  microservicio este listo.
+- Implementar `ReservationsClient`, `ReservationsProxyController` y los DTOs
+  correspondientes cuando `ms-andesstay-reservations` esté disponible (la regla
+  de seguridad en `SecurityConfig` ya está en su lugar).
+- Agregar `ReservationsProxySecurityTest` con los escenarios de cada rol.
 - Desplegar en EC2 detras de AWS API Gateway, segun lo definido en el
   encargo para el resto de los componentes.
 
