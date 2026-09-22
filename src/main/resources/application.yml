@@ -29,6 +29,8 @@ andesstay:
       base-url: ${CATALOG_SERVICE_URL:http://localhost:8081}
     audit:
       base-url: ${AUDIT_SERVICE_URL:http://localhost:8083}
+    reservations:
+      base-url: ${RESERVATIONS_SERVICE_URL:http://localhost:8082}
 
 cors:
   # Origen del frontend Angular (login con Cognito y llamadas al BFF desde aqui).

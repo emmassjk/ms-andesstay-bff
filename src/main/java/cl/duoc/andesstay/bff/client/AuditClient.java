@@ -7,6 +7,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -39,6 +40,6 @@ public class AuditClient {
                         .build())
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<PageResponse<AuditEventDto>>() { })
-                .block();
+                .block(Duration.ofSeconds(6));
     }
 }

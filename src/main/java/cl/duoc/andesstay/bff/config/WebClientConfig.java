@@ -1,19 +1,19 @@
 package cl.duoc.andesstay.bff.config;
 
 import cl.duoc.andesstay.bff.security.BearerTokenPropagationFilter;
+import io.netty.channel.ChannelOption;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
 
-/**
- * Clientes HTTP usados por el BFF para reenviar (proxy) las peticiones ya
- * autenticadas/autorizadas hacia los microservicios de dominio.
- *
- * Ambos clientes reenvian el access token de Cognito del usuario
- * (BearerTokenPropagationFilter), porque catalog y audit validan el JWT por
- * su cuenta y responden 401 si no llega el header Authorization.
- */
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
 @Configuration
 public class WebClientConfig {
 
@@ -23,20 +23,41 @@ public class WebClientConfig {
     @Value("${andesstay.services.audit.base-url}")
     private String auditBaseUrl;
 
-    /** Cliente hacia ms-andesstay-catalog. */
+    @Value("${andesstay.services.reservations.base-url}")
+    private String reservationsBaseUrl;
+
+    private HttpClient timeoutHttpClient() {
+        return HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000)
+                .responseTimeout(Duration.ofSeconds(5))
+                .doOnConnected(conn -> conn
+                        .addHandlerLast(new ReadTimeoutHandler(5, TimeUnit.SECONDS))
+                        .addHandlerLast(new WriteTimeoutHandler(5, TimeUnit.SECONDS)));
+    }
+
     @Bean
     public WebClient catalogWebClient() {
         return WebClient.builder()
                 .baseUrl(catalogBaseUrl)
+                .clientConnector(new ReactorClientHttpConnector(timeoutHttpClient()))
                 .filter(new BearerTokenPropagationFilter())
                 .build();
     }
 
-    /** Cliente hacia ms-andesstay-audit. */
     @Bean
     public WebClient auditWebClient() {
         return WebClient.builder()
                 .baseUrl(auditBaseUrl)
+                .clientConnector(new ReactorClientHttpConnector(timeoutHttpClient()))
+                .filter(new BearerTokenPropagationFilter())
+                .build();
+    }
+
+    @Bean
+    public WebClient reservationsWebClient() {
+        return WebClient.builder()
+                .baseUrl(reservationsBaseUrl)
+                .clientConnector(new ReactorClientHttpConnector(timeoutHttpClient()))
                 .filter(new BearerTokenPropagationFilter())
                 .build();
     }
