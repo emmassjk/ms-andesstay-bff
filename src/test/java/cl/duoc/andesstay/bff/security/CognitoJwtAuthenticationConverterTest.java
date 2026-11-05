@@ -23,7 +23,7 @@ class CognitoJwtAuthenticationConverterTest {
                 .map(GrantedAuthority::getAuthority)
                 .toList();
 
-        assertThat(authorities).containsExactlyInAnyOrder("ROLE_ADMIN", "ROLE_AUDITOR");
+        assertThat(authorities).contains("ROLE_ADMIN", "ROLE_AUDITOR");
     }
 
     @Test
@@ -31,6 +31,33 @@ class CognitoJwtAuthenticationConverterTest {
         Jwt jwt = baseJwt().build();
 
         assertThat(converter.convert(jwt).getAuthorities()).isEmpty();
+    }
+
+    @Test
+    void mapeaScopesOAuth2ConPrefijoScope() {
+        Jwt jwt = baseJwt()
+                .claim("scope", "openid profile email")
+                .build();
+
+        List<String> authorities = converter.convert(jwt).getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .toList();
+
+        assertThat(authorities).containsExactlyInAnyOrder("SCOPE_openid", "SCOPE_profile", "SCOPE_email");
+    }
+
+    @Test
+    void combinaGruposYScopesEnLasAuthorities() {
+        Jwt jwt = baseJwt()
+                .claim("cognito:groups", List.of("ADMIN"))
+                .claim("scope", "openid")
+                .build();
+
+        List<String> authorities = converter.convert(jwt).getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .toList();
+
+        assertThat(authorities).containsExactlyInAnyOrder("ROLE_ADMIN", "SCOPE_openid");
     }
 
     private Jwt.Builder baseJwt() {

@@ -26,6 +26,9 @@ public class WebClientConfig {
     @Value("${andesstay.services.reservations.base-url}")
     private String reservationsBaseUrl;
 
+    @Value("${andesstay.services.users.base-url}")
+    private String usersBaseUrl;
+
     private HttpClient timeoutHttpClient() {
         return HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000)
@@ -57,6 +60,15 @@ public class WebClientConfig {
     public WebClient reservationsWebClient() {
         return WebClient.builder()
                 .baseUrl(reservationsBaseUrl)
+                .clientConnector(new ReactorClientHttpConnector(timeoutHttpClient()))
+                .filter(new BearerTokenPropagationFilter())
+                .build();
+    }
+
+    @Bean
+    public WebClient usersWebClient() {
+        return WebClient.builder()
+                .baseUrl(usersBaseUrl)
                 .clientConnector(new ReactorClientHttpConnector(timeoutHttpClient()))
                 .filter(new BearerTokenPropagationFilter())
                 .build();

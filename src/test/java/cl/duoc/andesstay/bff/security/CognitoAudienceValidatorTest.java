@@ -34,6 +34,28 @@ class CognitoAudienceValidatorTest {
         assertThat(validator.validate(idToken).hasErrors()).isTrue();
     }
 
+    @Test
+    void rechazaTokenExpirado() {
+        Jwt tokenExpirado = Jwt.withTokenValue("token-de-prueba")
+                .header("alg", "none")
+                .claim("sub", "usuario-de-prueba")
+                .claim("client_id", CLIENT_ID)
+                .issuedAt(Instant.now().minusSeconds(7200))
+                .expiresAt(Instant.now().minusSeconds(3600))
+                .build();
+
+        assertThat(validator.validate(tokenExpirado).hasErrors()).isTrue();
+    }
+
+    @Test
+    void aceptaTokenNoExpiradoConClientIdCorrecto() {
+        Jwt tokenValido = jwtBuilder()
+                .claim("client_id", CLIENT_ID)
+                .build();
+
+        assertThat(validator.validate(tokenValido).hasErrors()).isFalse();
+    }
+
     private Jwt.Builder jwtBuilder() {
         return Jwt.withTokenValue("token-de-prueba")
                 .header("alg", "none")

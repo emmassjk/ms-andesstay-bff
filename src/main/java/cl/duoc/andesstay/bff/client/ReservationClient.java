@@ -1,9 +1,6 @@
 package cl.duoc.andesstay.bff.client;
 
-<<<<<<< HEAD
 import java.time.Duration;
-=======
->>>>>>> origin/main
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -32,11 +29,7 @@ public class ReservationClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-<<<<<<< HEAD
                 .block(Duration.ofSeconds(6));
-=======
-                .block();
->>>>>>> origin/main
     }
 
     public PageResponse<ReservationResponseDto> listar(String guestId, Long unitId, String estado,
@@ -55,11 +48,7 @@ public class ReservationClient {
                         .build())
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<PageResponse<ReservationResponseDto>>() { })
-<<<<<<< HEAD
                 .block(Duration.ofSeconds(6));
-=======
-                .block();
->>>>>>> origin/main
     }
 
     public List<ReservationResponseDto> misReservas() {
@@ -68,11 +57,7 @@ public class ReservationClient {
                 .retrieve()
                 .bodyToFlux(ReservationResponseDto.class)
                 .collectList()
-<<<<<<< HEAD
                 .block(Duration.ofSeconds(6));
-=======
-                .block();
->>>>>>> origin/main
     }
 
     public ReservationResponseDto obtener(Long id) {
@@ -80,11 +65,7 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}", id)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-<<<<<<< HEAD
                 .block(Duration.ofSeconds(6));
-=======
-                .block();
->>>>>>> origin/main
     }
 
     public ReservationResponseDto confirmar(Long id) {
@@ -92,11 +73,7 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}/confirmar", id)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-<<<<<<< HEAD
                 .block(Duration.ofSeconds(6));
-=======
-                .block();
->>>>>>> origin/main
     }
 
     public ReservationResponseDto checkIn(Long id) {
@@ -104,11 +81,7 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}/checkin", id)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-<<<<<<< HEAD
                 .block(Duration.ofSeconds(6));
-=======
-                .block();
->>>>>>> origin/main
     }
 
     public ReservationResponseDto checkOut(Long id) {
@@ -116,11 +89,7 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}/checkout", id)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-<<<<<<< HEAD
                 .block(Duration.ofSeconds(6));
-=======
-                .block();
->>>>>>> origin/main
     }
 
     public ReservationResponseDto cancelar(Long id) {
@@ -128,11 +97,7 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}/cancelar", id)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-<<<<<<< HEAD
                 .block(Duration.ofSeconds(6));
-=======
-                .block();
->>>>>>> origin/main
     }
 
     public void eliminar(Long id) {
@@ -140,10 +105,6 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}", id)
                 .retrieve()
                 .toBodilessEntity()
-<<<<<<< HEAD
                 .block(Duration.ofSeconds(6));
-=======
-                .block();
->>>>>>> origin/main
     }
 }
