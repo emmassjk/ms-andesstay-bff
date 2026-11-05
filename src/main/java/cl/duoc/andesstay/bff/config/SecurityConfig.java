@@ -36,6 +36,10 @@ import java.util.List;
  *        POST /api/reservations/**         -> RECEPCIONISTA o ADMIN
  *        PUT/PATCH /api/reservations/**    -> RECEPCIONISTA o ADMIN
  *        DELETE /api/reservations/**       -> solo ADMIN
+ *        POST /api/users/register          -> publico (registro)
+ *        POST /api/users/login             -> publico (login OIDC)
+ *        GET  /api/users/me                -> cualquier usuario autenticado
+ *        GET  /api/users/**                -> ADMIN o RECEPCIONISTA
  *
  *   3. Solo si ambas condiciones se cumplen, permite que la peticion llegue
  *      al controller que reenvia la llamada al microservicio de dominio
@@ -78,6 +82,13 @@ public class SecurityConfig {
                         // health publico para el API Gateway / balanceador si se agrega actuator
                         .requestMatchers("/actuator/health").permitAll()
 
+                        // --- Usuarios: registro y login son publicos (flujo OIDC/Cognito) ---
+                        .requestMatchers(HttpMethod.POST, "/api/users/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/users/login").permitAll()
+                        .requestMatchers(HttpMethod.GET,  "/api/users/me").authenticated()
+                        .requestMatchers(HttpMethod.GET,  "/api/users/**").hasAnyRole("ADMIN", "RECEPCIONISTA")
+                        .requestMatchers(HttpMethod.PUT,  "/api/users/**").authenticated()
+
                         // --- Catalogo (mismas reglas que ms-andesstay-catalog) ---
                         .requestMatchers(HttpMethod.GET, "/api/catalog/units/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/catalog/units/**").hasRole("ADMIN")
@@ -110,15 +121,35 @@ public class SecurityConfig {
 
     /**
      * Permite que Angular (levantado en otro origen/puerto) consuma el BFF
-     * enviando el header Authorization: Bearer <access_token>.
+     * enviando el header Authorization: Bearer &lt;access_token&gt;.
+     *
+     * Se permiten todos los origenes configurados (o "*" para desarrollo),
+     * los metodos HTTP basicos (GET, POST, PUT, DELETE, PATCH, OPTIONS),
+     * todos los headers (incluido Authorization) y se expone el header
+     * Authorization para que el frontend pueda leerlo en las respuestas.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(allowedOrigins.split(",")));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+
+        // Origenes: soporta multiples separados por coma en la property
+        List<String> origins = List.of(allowedOrigins.split(","));
+        configuration.setAllowedOrigins(origins);
+
+        // Metodos HTTP permitidos (incluye PATCH y OPTIONS para preflight)
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+
+        // Todos los headers permitidos (Authorization, Content-Type, X-Requested-With, etc.)
+        configuration.setAllowedHeaders(List.of("*"));
+
+        // Exponer el header Authorization para que el frontend Angular pueda leerlo
+        configuration.setExposedHeaders(List.of("Authorization"));
+
+        // Permitir envio de cookies/credenciales (necesario para flujos OIDC)
         configuration.setAllowCredentials(true);
+
+        // Cache de preflight de 1 hora para reducir llamadas OPTIONS
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
