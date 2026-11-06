@@ -1,9 +1,5 @@
 package cl.duoc.andesstay.bff.client;
 
-import cl.duoc.andesstay.bff.dto.AuthResponseDto;
-import cl.duoc.andesstay.bff.dto.UserLoginRequestDto;
-import cl.duoc.andesstay.bff.dto.UserRegisterRequestDto;
-import cl.duoc.andesstay.bff.dto.UserResponseDto;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -11,24 +7,32 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Encapsula las llamadas HTTP hacia ms-andesstay-users.
  *
  * <ul>
- *   <li>Registro y login son operaciones publicas (no requieren token).</li>
- *   <li>Las demas operaciones (perfil, listado) requieren el access token de
- *       Cognito del usuario, que se reenvia automaticamente gracias a
- *       {@link cl.duoc.andesstay.bff.security.BearerTokenPropagationFilter}
+ *   <li>Registro (POST /api/users) es publico (no requiere token).</li>
+ *   <li>Las demas operaciones (perfil, listado, actualizacion, baja) requieren
+ *       el access token de Cognito del usuario, que se reenvia automaticamente
+ *       gracias a {@link cl.duoc.andesstay.bff.security.BearerTokenPropagationFilter}
  *       configurado en el WebClient.</li>
  * </ul>
  *
- * Se usa {@code .block()} porque el BFF es una app servlet (MVC) clasica:
- * cada request ya corre en su propio hilo, asi que no se busca no-bloqueo
- * aqui, solo reusar WebClient como cliente HTTP moderno.
+ * Se usa {@code Map<String,Object>} como passthrough generico mientras el
+ * contrato del servicio de usuarios no este cerrado; cuando se fije, se
+ * reemplaza por DTOs tipados (record).
+ *
+ * Se usa {@code .block(TIMEOUT)} porque el BFF es una app servlet (MVC)
+ * clasica: cada request ya corre en su propio hilo, asi que no se busca
+ * no-bloqueo aqui, solo reusar WebClient como cliente HTTP moderno.
  */
 @Component
 public class UsersClient {
+
+    /** Timeout maximo de espera para cada llamada al microservicio. */
+    private static final Duration TIMEOUT = Duration.ofSeconds(6);
 
     private final WebClient usersWebClient;
 
@@ -37,74 +41,72 @@ public class UsersClient {
     }
 
     /**
-     * Registra un nuevo usuario. No requiere token (endpoint publico).
-     */
-    public UserResponseDto register(UserRegisterRequestDto request) {
-        return usersWebClient.post()
-                .uri("/api/users/register")
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(UserResponseDto.class)
-                .block(Duration.ofSeconds(6));
-    }
-
-    /**
-     * Inicia sesion contra Cognito (flujo USER_PASSWORD_AUTH). No requiere
-     * token (endpoint publico). Devuelve los tokens OIDC.
-     */
-    public AuthResponseDto login(UserLoginRequestDto request) {
-        return usersWebClient.post()
-                .uri("/api/users/login")
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(AuthResponseDto.class)
-                .block(Duration.ofSeconds(6));
-    }
-
-    /**
      * Obtiene el perfil del usuario autenticado (token propagado).
+     * ⚠️ Ruta supuesta: ajustar si el contrato real del servicio difiere.
      */
-    public UserResponseDto getMyProfile() {
+    public Map<String, Object> me() {
         return usersWebClient.get()
                 .uri("/api/users/me")
                 .retrieve()
-                .bodyToMono(UserResponseDto.class)
-                .block(Duration.ofSeconds(6));
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() { })
+                .block(TIMEOUT);
     }
 
     /**
-     * Obtiene un usuario por su ID (requiere rol ADMIN o RECEPCIONISTA).
+     * Lista todos los usuarios (requiere rol ADMIN).
      */
-    public UserResponseDto findById(String id) {
-        return usersWebClient.get()
-                .uri("/api/users/{id}", id)
-                .retrieve()
-                .bodyToMono(UserResponseDto.class)
-                .block(Duration.ofSeconds(6));
-    }
-
-    /**
-     * Lista todos los usuarios (requiere rol ADMIN o RECEPCIONISTA).
-     */
-    public List<UserResponseDto> findAll() {
+    public List<Map<String, Object>> findAll() {
         return usersWebClient.get()
                 .uri("/api/users")
                 .retrieve()
-                .bodyToFlux(UserResponseDto.class)
-                .collectList()
-                .block(Duration.ofSeconds(6));
+                .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() { })
+                .block(TIMEOUT);
     }
 
     /**
-     * Actualiza el perfil de un usuario (el propio o por un ADMIN).
+     * Obtiene un usuario por su ID (requiere rol ADMIN).
      */
-    public UserResponseDto update(String id, UserRegisterRequestDto request) {
+    public Map<String, Object> findById(String id) {
+        return usersWebClient.get()
+                .uri("/api/users/{id}", id)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() { })
+                .block(TIMEOUT);
+    }
+
+    /**
+     * Registra un nuevo usuario. No requiere token (endpoint publico).
+     * ⚠️ Campos supuestos: ajustar si el contrato real del servicio difiere.
+     */
+    public Map<String, Object> register(Map<String, Object> body) {
+        return usersWebClient.post()
+                .uri("/api/users")
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() { })
+                .block(TIMEOUT);
+    }
+
+    /**
+     * Actualiza datos de un usuario (requiere rol ADMIN).
+     */
+    public Map<String, Object> update(String id, Map<String, Object> body) {
         return usersWebClient.put()
                 .uri("/api/users/{id}", id)
-                .bodyValue(request)
+                .bodyValue(body)
                 .retrieve()
-                .bodyToMono(UserResponseDto.class)
-                .block(Duration.ofSeconds(6));
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() { })
+                .block(TIMEOUT);
+    }
+
+    /**
+     * Elimina un usuario (requiere rol ADMIN).
+     */
+    public void delete(String id) {
+        usersWebClient.delete()
+                .uri("/api/users/{id}", id)
+                .retrieve()
+                .toBodilessEntity()
+                .block(TIMEOUT);
     }
 }
-

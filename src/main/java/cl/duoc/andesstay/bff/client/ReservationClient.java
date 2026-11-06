@@ -14,8 +14,22 @@ import cl.duoc.andesstay.bff.dto.PageResponse;
 import cl.duoc.andesstay.bff.dto.ReservationRequestDto;
 import cl.duoc.andesstay.bff.dto.ReservationResponseDto;
 
+/**
+ * Encapsula las llamadas HTTP hacia ms-andesstay-reservations.
+ *
+ * El access token de Cognito del usuario se reenvia en cada llamada gracias
+ * a {@link cl.duoc.andesstay.bff.security.BearerTokenPropagationFilter}
+ * configurado en el WebClient.
+ *
+ * Se usa {@code .block(TIMEOUT)} porque el BFF es una app servlet (MVC)
+ * clasica: cada request ya corre en su propio hilo, asi que no se busca
+ * no-bloqueo aqui, solo reusar WebClient como cliente HTTP moderno.
+ */
 @Component
 public class ReservationClient {
+
+    /** Timeout maximo de espera para cada llamada al microservicio. */
+    private static final Duration TIMEOUT = Duration.ofSeconds(6);
 
     private final WebClient reservationsWebClient;
 
@@ -29,7 +43,7 @@ public class ReservationClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-                .block(Duration.ofSeconds(6));
+                .block(TIMEOUT);
     }
 
     public PageResponse<ReservationResponseDto> listar(String guestId, Long unitId, String estado,
@@ -48,7 +62,7 @@ public class ReservationClient {
                         .build())
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<PageResponse<ReservationResponseDto>>() { })
-                .block(Duration.ofSeconds(6));
+                .block(TIMEOUT);
     }
 
     public List<ReservationResponseDto> misReservas() {
@@ -57,7 +71,7 @@ public class ReservationClient {
                 .retrieve()
                 .bodyToFlux(ReservationResponseDto.class)
                 .collectList()
-                .block(Duration.ofSeconds(6));
+                .block(TIMEOUT);
     }
 
     public ReservationResponseDto obtener(Long id) {
@@ -65,7 +79,7 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}", id)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-                .block(Duration.ofSeconds(6));
+                .block(TIMEOUT);
     }
 
     public ReservationResponseDto confirmar(Long id) {
@@ -73,7 +87,7 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}/confirmar", id)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-                .block(Duration.ofSeconds(6));
+                .block(TIMEOUT);
     }
 
     public ReservationResponseDto checkIn(Long id) {
@@ -81,7 +95,7 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}/checkin", id)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-                .block(Duration.ofSeconds(6));
+                .block(TIMEOUT);
     }
 
     public ReservationResponseDto checkOut(Long id) {
@@ -89,7 +103,7 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}/checkout", id)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-                .block(Duration.ofSeconds(6));
+                .block(TIMEOUT);
     }
 
     public ReservationResponseDto cancelar(Long id) {
@@ -97,7 +111,7 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}/cancelar", id)
                 .retrieve()
                 .bodyToMono(ReservationResponseDto.class)
-                .block(Duration.ofSeconds(6));
+                .block(TIMEOUT);
     }
 
     public void eliminar(Long id) {
@@ -105,6 +119,6 @@ public class ReservationClient {
                 .uri("/api/reservations/{id}", id)
                 .retrieve()
                 .toBodilessEntity()
-                .block(Duration.ofSeconds(6));
+                .block(TIMEOUT);
     }
 }
