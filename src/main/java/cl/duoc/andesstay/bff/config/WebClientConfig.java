@@ -14,6 +14,14 @@ import reactor.netty.http.client.HttpClient;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Crea los {@link WebClient} que los clientes de cada microservicio de
+ * dominio usan para reenviar las peticiones del frontend.
+ *
+ * Todos comparten la misma configuracion de timeouts y propagan el access
+ * token de Cognito del usuario autenticado gracias a
+ * {@link BearerTokenPropagationFilter}.
+ */
 @Configuration
 public class WebClientConfig {
 
@@ -29,6 +37,9 @@ public class WebClientConfig {
     @Value("${andesstay.services.users.base-url}")
     private String usersBaseUrl;
 
+    /**
+     * Crea un {@link HttpClient} con timeouts estandar.
+     */
     private HttpClient timeoutHttpClient() {
         return HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000)
@@ -38,39 +49,36 @@ public class WebClientConfig {
                         .addHandlerLast(new WriteTimeoutHandler(5, TimeUnit.SECONDS)));
     }
 
-    @Bean
-    public WebClient catalogWebClient() {
+    /**
+     * Metodo auxiliar que crea un WebClient con la misma configuracion
+     * de timeouts y propagacion de token para cualquier microservicio.
+     * Evita repetir el patron builder-connector-filter en cada bean.
+     */
+    private WebClient buildClient(String baseUrl) {
         return WebClient.builder()
-                .baseUrl(catalogBaseUrl)
+                .baseUrl(baseUrl)
                 .clientConnector(new ReactorClientHttpConnector(timeoutHttpClient()))
                 .filter(new BearerTokenPropagationFilter())
                 .build();
+    }
+
+    @Bean
+    public WebClient catalogWebClient() {
+        return buildClient(catalogBaseUrl);
     }
 
     @Bean
     public WebClient auditWebClient() {
-        return WebClient.builder()
-                .baseUrl(auditBaseUrl)
-                .clientConnector(new ReactorClientHttpConnector(timeoutHttpClient()))
-                .filter(new BearerTokenPropagationFilter())
-                .build();
+        return buildClient(auditBaseUrl);
     }
 
     @Bean
     public WebClient reservationsWebClient() {
-        return WebClient.builder()
-                .baseUrl(reservationsBaseUrl)
-                .clientConnector(new ReactorClientHttpConnector(timeoutHttpClient()))
-                .filter(new BearerTokenPropagationFilter())
-                .build();
+        return buildClient(reservationsBaseUrl);
     }
 
     @Bean
     public WebClient usersWebClient() {
-        return WebClient.builder()
-                .baseUrl(usersBaseUrl)
-                .clientConnector(new ReactorClientHttpConnector(timeoutHttpClient()))
-                .filter(new BearerTokenPropagationFilter())
-                .build();
+        return buildClient(usersBaseUrl);
     }
 }

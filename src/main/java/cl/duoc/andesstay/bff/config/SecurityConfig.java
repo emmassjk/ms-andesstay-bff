@@ -29,25 +29,23 @@ import java.util.List;
  *      CognitoJwtAuthenticationConverter), con las mismas reglas que los
  *      microservicios de dominio:
  *
- *        GET  /api/catalog/units/**        -> cualquier usuario autenticado
- *        POST/PUT/DELETE catalogo          -> solo ADMIN
- *        GET  /api/audit/**                -> ADMIN o AUDITOR
- *        GET  /api/reservations/**         -> cualquier usuario autenticado
- *        POST /api/reservations/**         -> RECEPCIONISTA o ADMIN
- *        PUT/PATCH /api/reservations/**    -> RECEPCIONISTA o ADMIN
- *        DELETE /api/reservations/**       -> solo ADMIN
- *        POST /api/users/register          -> publico (registro)
- *        POST /api/users/login             -> publico (login OIDC)
- *        GET  /api/users/me                -> cualquier usuario autenticado
- *        GET  /api/users/**                -> ADMIN o RECEPCIONISTA
+ *        OPTIONS /**                       -> permitAll (preflight CORS sin token)
+ *        GET  /api/users/me               -> cualquier usuario autenticado
+ *        POST /api/users                  -> cualquier usuario autenticado (registro)
+ *        GET  /api/users/**               -> solo ADMIN
+ *        PUT  /api/users/**               -> solo ADMIN
+ *        DELETE /api/users/**             -> solo ADMIN
+ *        GET  /api/catalog/units/**       -> cualquier usuario autenticado
+ *        POST/PUT/DELETE catalogo         -> solo ADMIN
+ *        GET  /api/audit/**               -> ADMIN o AUDITOR
+ *        GET  /api/reservations/**        -> cualquier usuario autenticado
+ *        POST /api/reservations/**        -> HUESPED, RECEPCIONISTA o ADMIN
+ *        PUT/PATCH /api/reservations/**   -> RECEPCIONISTA o ADMIN
+ *        DELETE /api/reservations/**      -> solo ADMIN
  *
  *   3. Solo si ambas condiciones se cumplen, permite que la peticion llegue
  *      al controller que reenvia la llamada al microservicio de dominio
  *      (junto con el mismo token, ver BearerTokenPropagationFilter).
- *
- * Antes esta cadena tenia anyRequest().permitAll() y el resource server no
- * estaba conectado, asi que el BFF no exigia token en ninguna ruta. Ahora
- * .oauth2ResourceServer(...) SI queda conectado al filterChain.
  */
 @Configuration
 @EnableWebSecurity
@@ -76,18 +74,23 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Preflight CORS: el navegador manda OPTIONS sin token antes de cada
+                        // peticion cross-origin; debe pasar sin autenticacion.
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                         // Sin esto, cualquier error que Spring MVC resuelva con sendError() (p.ej. JSON mal
                         // formado) se redirige a /error, que llega sin token y terminaria como 401/403.
                         .requestMatchers("/error").permitAll()
                         // health publico para el API Gateway / balanceador si se agrega actuator
                         .requestMatchers("/actuator/health").permitAll()
 
-                        // --- Usuarios: registro y login son publicos (flujo OIDC/Cognito) ---
-                        .requestMatchers(HttpMethod.POST, "/api/users/register").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/users/login").permitAll()
+                        // --- Usuarios (ms-andesstay-users) ---
+                        // Rutas especificas ANTES de las generales para que Spring las evalue primero.
                         .requestMatchers(HttpMethod.GET,  "/api/users/me").authenticated()
-                        .requestMatchers(HttpMethod.GET,  "/api/users/**").hasAnyRole("ADMIN", "RECEPCIONISTA")
-                        .requestMatchers(HttpMethod.PUT,  "/api/users/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/users").authenticated()
+                        .requestMatchers(HttpMethod.GET,    "/api/users/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT,    "/api/users/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/users/**").hasRole("ADMIN")
 
                         // --- Catalogo (mismas reglas que ms-andesstay-catalog) ---
                         .requestMatchers(HttpMethod.GET, "/api/catalog/units/**").authenticated()
@@ -123,10 +126,9 @@ public class SecurityConfig {
      * Permite que Angular (levantado en otro origen/puerto) consuma el BFF
      * enviando el header Authorization: Bearer &lt;access_token&gt;.
      *
-     * Se permiten todos los origenes configurados (o "*" para desarrollo),
-     * los metodos HTTP basicos (GET, POST, PUT, DELETE, PATCH, OPTIONS),
-     * todos los headers (incluido Authorization) y se expone el header
-     * Authorization para que el frontend pueda leerlo en las respuestas.
+     * IMPORTANTE: si el AWS API Gateway tambien agrega headers CORS en sus
+     * respuestas, dejarlo activo en UNO solo (BFF o API Gateway), porque
+     * headers CORS duplicados hacen que el navegador bloquee la llamada.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -137,10 +139,10 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(origins);
 
         // Metodos HTTP permitidos (incluye PATCH y OPTIONS para preflight)
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
-        // Todos los headers permitidos (Authorization, Content-Type, X-Requested-With, etc.)
-        configuration.setAllowedHeaders(List.of("*"));
+        // Headers que el frontend puede enviar
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
 
         // Exponer el header Authorization para que el frontend Angular pueda leerlo
         configuration.setExposedHeaders(List.of("Authorization"));
