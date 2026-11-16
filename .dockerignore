@@ -1,0 +1,12 @@
+# ─── Docker ignore — ms-andesstay-bff ──────────────────────────────────────────
+# Excluir archivos innecesarios para el build de la imagen Docker
+.git
+.gitignore
+.idea
+.vscode
+.env
+*.env
+target
+README.md
+*.md
+docker-compose*.yml

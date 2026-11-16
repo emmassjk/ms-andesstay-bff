@@ -1,0 +1,45 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# docker-compose.yml — ms-andesstay-bff (Docker Desktop / Local)
+#
+# Comandos principales:
+#   docker compose up -d --build       # Construye y levanta el BFF en segundo plano
+#   docker compose logs -f bff-service # Monitorear logs en tiempo real
+#   docker compose ps                  # Ver estado y healthcheck
+#   docker compose down                # Detener el servicio
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+  bff-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ms-andesstay-bff:latest
+    container_name: ms-andesstay-bff
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      SERVER_PORT: 8080
+      COGNITO_REGION: ${COGNITO_REGION:-us-east-1}
+      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-CHANGE_ME}
+      COGNITO_APP_CLIENT_ID: ${COGNITO_APP_CLIENT_ID:-CHANGE_ME}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4200}
+
+      # URLs de los microservicios de dominio.
+      # host.docker.internal permite acceder a microservicios levantados localmente en la máquina host
+      # o en otros contenedores de Docker Desktop con puertos mapeados.
+      CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://host.docker.internal:8081}
+      RESERVATIONS_SERVICE_URL: ${RESERVATIONS_SERVICE_URL:-http://host.docker.internal:8082}
+      AUDIT_SERVICE_URL: ${AUDIT_SERVICE_URL:-http://host.docker.internal:8083}
+      USERS_SERVICE_URL: ${USERS_SERVICE_URL:-http://host.docker.internal:8085}
+
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - andesstay-net
+
+networks:
+  andesstay-net:
+    name: andesstay-net
+    driver: bridge

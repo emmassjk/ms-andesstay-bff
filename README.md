@@ -105,6 +105,28 @@ local), pero rechaza todos los tokens con `401` hasta que se configure el User P
 
 ## Como correrlo local
 
+### Opcion A: Con Docker / Docker Compose (Recomendado)
+
+El microservicio incluye `Dockerfile` multi-stage y `docker-compose.yml` listos para usar:
+
+```bash
+# 1. Construir la imagen y levantar el contenedor en segundo plano
+docker compose up -d --build
+
+# 2. Ver logs en tiempo real
+docker compose logs -f bff-service
+
+# 3. Verificar estado del contenedor y su healthcheck
+docker compose ps
+
+# 4. Detener el contenedor
+docker compose down
+```
+
+El BFF quedara disponible en `http://localhost:8080` con healthcheck activo en `/actuator/health`.
+
+### Opcion B: Con Maven (Host local)
+
 1. Levantar los microservicios de dominio en sus puertos respectivos,
    configurados con el mismo User Pool de Cognito.
 2. Exportar las variables de entorno de arriba (o copiar `.env.example` a `.env`).
