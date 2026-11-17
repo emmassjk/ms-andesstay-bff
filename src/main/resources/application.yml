@@ -38,6 +38,15 @@ cors:
   # Origen del frontend Angular (login con Cognito y llamadas al BFF desde aqui).
   allowed-origins: ${FRONTEND_URL:http://localhost:4200}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
 logging:
   level:
     org.springframework.security: INFO
