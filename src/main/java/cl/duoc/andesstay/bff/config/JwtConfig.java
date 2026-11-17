@@ -57,10 +57,10 @@ public class JwtConfig {
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        if (issuerUri != null && issuerUri.contains("CHANGE_ME")) {
-            log.warn("El issuer-uri contiene el placeholder 'CHANGE_ME'. Se usa un JwtDecoder de respaldo "
+        if (issuerUri != null && (issuerUri.contains("CHANGE_ME") || issuerUri.contains("XXXXXXXXX"))) {
+            log.warn("El issuer-uri contiene el placeholder 'CHANGE_ME' o 'XXXXXXXXX'. Se usa un JwtDecoder de respaldo "
                     + "que rechaza todos los tokens (401) para permitir el inicio de la app en desarrollo local. "
-                    + "Configura COGNITO_REGION, COGNITO_USER_POOL_ID y COGNITO_APP_CLIENT_ID para conectarte a Cognito.");
+                    + "Configura COGNITO_REGION, COGNITO_USER_POOL_ID y COGNITO_APP_CLIENT_ID con los valores reales de tu User Pool en Cognito.");
             return token -> {
                 throw new JwtException("No se ha configurado un User Pool de Cognito valido en las variables de entorno.");
             };
