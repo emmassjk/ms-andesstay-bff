@@ -40,6 +40,8 @@ import java.util.List;
  *        GET  /api/audit/**               -> ADMIN o AUDITOR
  *        GET  /api/reservations/**        -> cualquier usuario autenticado
  *        POST /api/reservations/**        -> HUESPED, RECEPCIONISTA o ADMIN
+ *        PUT  /api/reservations/{id}/cancelar -> cualquier usuario autenticado (el microservicio
+ *                                        valida que sea el dueno de la reserva, RECEPCIONISTA o ADMIN)
  *        PUT/PATCH /api/reservations/**   -> RECEPCIONISTA o ADMIN
  *        DELETE /api/reservations/**      -> solo ADMIN
  *
@@ -107,6 +109,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,    "/api/reservations/**").authenticated()
                         // POST: crear reserva -> huesped, recepcionista o admin.
                         .requestMatchers(HttpMethod.POST,   "/api/reservations/**").hasAnyRole("HUESPED", "RECEPCIONISTA", "ADMIN")
+                        // PUT cancelar: lo puede pedir cualquier autenticado porque el huesped debe poder
+                        // cancelar SU reserva. La regla fina (dueno, RECEPCIONISTA o ADMIN) la aplica
+                        // ms-andesstay-reservations con @PreAuthorize. Va ANTES del PUT general.
+                        .requestMatchers(HttpMethod.PUT,    "/api/reservations/*/cancelar").authenticated()
                         // PUT/PATCH: modificar reserva -> recepcionista o admin.
                         .requestMatchers(HttpMethod.PUT,    "/api/reservations/**").hasAnyRole("RECEPCIONISTA", "ADMIN")
                         .requestMatchers(HttpMethod.PATCH,  "/api/reservations/**").hasAnyRole("RECEPCIONISTA", "ADMIN")

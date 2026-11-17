@@ -114,6 +114,13 @@ class ReservationsProxySecurityTest {
     }
 
     @Test
+    void putCancelarConRolHuespedDeberiaPoder() throws Exception {
+        mockMvc.perform(put("/api/reservations/1/cancelar")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_HUESPED"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void deleteConRolRecepcionistaNoDeberiaPoder() throws Exception {
         mockMvc.perform(delete("/api/reservations/1")
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_RECEPCIONISTA"))))

@@ -43,3 +43,4 @@ networks:
   andesstay-net:
     name: andesstay-net
     driver: bridge
+
