@@ -64,8 +64,8 @@ public class CognitoJwtAuthenticationConverter implements Converter<Jwt, Abstrac
      */
     private Collection<GrantedAuthority> extractRoles(Jwt jwt) {
         List<String> groups = jwt.getClaimAsStringList(GROUPS_CLAIM);
-        if (groups == null) {
-            return List.of();
+        if (groups == null || groups.isEmpty()) {
+            return List.of(new SimpleGrantedAuthority(ROLE_PREFIX + "HUESPED"));
         }
         return groups.stream()
                 .filter(Objects::nonNull)
