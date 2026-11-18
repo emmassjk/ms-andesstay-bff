@@ -27,10 +27,27 @@ class CognitoJwtAuthenticationConverterTest {
     }
 
     @Test
-    void sinClaimDeGruposNoOtorgaRoles() {
+    void sinClaimDeGruposOtorgaRolDeHuesped() {
         Jwt jwt = baseJwt().build();
 
-        assertThat(converter.convert(jwt).getAuthorities()).isEmpty();
+        List<String> authorities = converter.convert(jwt).getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .toList();
+
+        assertThat(authorities).containsExactly("ROLE_HUESPED");
+    }
+
+    @Test
+    void conListaDeGruposVaciaOtorgaRolDeHuesped() {
+        Jwt jwt = baseJwt()
+                .claim("cognito:groups", List.of())
+                .build();
+
+        List<String> authorities = converter.convert(jwt).getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .toList();
+
+        assertThat(authorities).containsExactly("ROLE_HUESPED");
     }
 
     @Test
@@ -43,7 +60,8 @@ class CognitoJwtAuthenticationConverterTest {
                 .map(GrantedAuthority::getAuthority)
                 .toList();
 
-        assertThat(authorities).containsExactlyInAnyOrder("SCOPE_openid", "SCOPE_profile", "SCOPE_email");
+        assertThat(authorities).containsExactlyInAnyOrder(
+                "ROLE_HUESPED", "SCOPE_openid", "SCOPE_profile", "SCOPE_email");
     }
 
     @Test
